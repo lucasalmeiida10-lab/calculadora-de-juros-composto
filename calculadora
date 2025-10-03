@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Cronogramas de Obras</title>
+    <style>
+        /* --- GERAL E LAYOUT --- */
+        :root {
+            --cor-fundo: #f4f7fa;
+            --cor-borda: #dee2e6;
+            --cor-texto: #333;
+            --cor-cabecalho: #fff;
+            --cor-primaria: #007bff;
+            --cor-primaria-hover: #0056b3;
+            --sombra-card: 0 2px 4px rgba(0, 0, 0, 0.05);
+            --raio-borda: 8px;
+            --cor-valid-ok: #28a745;
+            --cor-valid-erro: #dc3545;
+            --cor-perigo: #dc3545;
+            --cor-perigo-hover: #c82333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            background-color: var(--cor-fundo);
+            color: var(--cor-texto);
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .main-container { display: flex; flex-grow: 1; overflow: hidden; }
+        
+        header {
+            background-color: var(--cor-cabecalho);
+            box-shadow: var(--sombra-card);
+            z-index: 10;
+        }
+
+        .obra-controls {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--cor-borda);
+            background-color: #f8f9fa;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .cronograma-controls {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .control-group { display: flex; align-items: center; gap: 8px; }
+        .control-group label { font-weight: 500; font-size: 0.9rem; }
+        input, select, button { padding: 8px 12px; border-radius: var(--raio-borda); border: 1px solid var(--cor-borda); font-size: 0.9rem; }
+        button { border: none; background-color: var(--cor-primaria); color: white; font-weight: bold; cursor: pointer; transition: background-color 0.2s ease; }
+        button:hover { background-color: var(--cor-primaria-hover); }
+        button.secondary { background-color: #6c757d; }
+        button.secondary:hover { background-color: #5a6268; }
+        button.danger { background-color: var(--cor-perigo); }
+        button.danger:hover { background-color: var(--cor-perigo-hover); }
+        button.icon-btn { padding: 8px; line-height: 1; font-size: 1.1rem; }
+
+        /* --- PAINEL ESQUERDO (LISTA PRINCIPAL) --- */
+        #main-list-panel {
+            width: 420px;
+            min-width: 380px;
+            background-color: #fff;
+            border-right: 1px solid var(--cor-borda);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--cor-borda);
+            background-color: #f8f9fa;
+        }
+        .panel-header h2 { font-size: 1.2rem; margin: 0 0 10px 0; }
+        #search-items { width: 100%; box-sizing: border-box; }
+        
+        #main-list-controls {
+             padding: 10px;
+             text-align: center;
+             border-bottom: 1px solid var(--cor-borda);
+        }
+
+        #add-item-form {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--cor-borda);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #main-list-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        /* --- PAINEL DIREITO (QUINZENAS) --- */
+        #fortnights-panel {
+            flex-grow: 1;
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 15px;
+            background-color: var(--cor-fundo);
+        }
+
+        .fortnight-column {
+            min-width: 320px;
+            max-width: 340px;
+            flex: 1 0 320px;
+            background-color: #fff;
+            border-radius: var(--raio-borda);
+            border: 1px solid var(--cor-borda);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .fortnight-header {
+            padding: 12px 15px;
+            margin: 0;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid var(--cor-borda);
+            text-align: center;
+        }
+
+        .fortnight-header h3 { font-size: 1rem; margin: 0 0 5px 0; }
+        .fortnight-header .date-range { font-size: 0.8rem; color: #6c757d; font-weight: normal; }
+        .fortnight-financials .value-display { font-size: 0.85rem; font-weight: 500; cursor: pointer; padding: 2px 5px; border-radius: 4px; }
+        .fortnight-financials .value-display:hover { background-color: #e9ecef; }
+        .fortnight-financials input { width: 100px; }
+        .fortnight-items { flex-grow: 1; overflow-y: auto; padding: 10px; min-height: 100px; }
+        
+        /* --- CARDS DE ITENS --- */
+        .item-card { background-color: white; padding: 12px; border: 1px solid var(--cor-borda); border-radius: var(--raio-borda); margin-bottom: 8px; cursor: grab; user-select: none; box-shadow: var(--sombra-card); transition: box-shadow 0.2s ease, background-color 0.2s ease; position: relative; }
+        .item-card:hover { border-color: #adb5bd; }
+        .item-card.dragging { opacity: 0.5; background-color: #e0e0e0; transform: rotate(2deg); }
+        .item-card strong { display: block; margin-bottom: 4px; color: var(--cor-texto); font-size: 0.95rem; padding-right: 40px; }
+        .item-card p { font-size: 0.85rem; color: #6c757d; margin: 0; }
+
+        .item-actions { display: none; align-items: center; position: absolute; top: 5px; right: 8px; background: white; border-radius: 5px; padding-left: 5px; }
+        .item-card:hover .item-actions { display: flex; }
+        .action-btn { background: none; border: none; font-size: 1.2rem; line-height: 1; color: #adb5bd; cursor: pointer; padding: 2px 4px; }
+        .action-btn:hover { color: var(--cor-primaria); }
+        .remove-item-btn { font-size: 1.5rem !important; }
+        .remove-item-btn:hover { color: var(--cor-perigo); }
+
+        .item-menu { display: none; position: absolute; right: 25px; top: 28px; background-color: white; border: 1px solid var(--cor-borda); border-radius: var(--raio-borda); box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 100; min-width: 120px;}
+        .item-menu button { background: none; border: none; color: var(--cor-texto); display: block; width: 100%; text-align: left; padding: 8px 15px; font-weight: normal; font-size: 0.9rem; }
+        .item-menu button:hover { background-color: var(--cor-fundo); }
+        
+        /* --- MODAIS --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 25px; border-radius: var(--raio-borda); width: 90%; max-width: 800px; display: flex; flex-direction: column; max-height: 80vh; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--cor-borda); padding-bottom: 10px; margin-bottom: 20px; }
+        .modal-header h2 { margin: 0; }
+        .modal-body { overflow-y: auto; flex-grow: 1; }
+        .modal-footer { border-top: 1px solid var(--cor-borda); padding-top: 15px; margin-top: 20px; text-align: right; }
+        #edit-item-form label { display: block; margin-bottom: 5px; font-weight: 500; }
+        #edit-item-form input { width: 100%; box-sizing: border-box; margin-bottom: 15px; }
+
+        /* Master List Modal Specific */
+        #master-list-body { padding-right: 10px; }
+        .master-item { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid #eee; }
+        .master-item-content { flex-grow: 1; cursor: grab; }
+        #new-master-item-form { display: flex; gap: 10px; }
+        #new-master-item-form input { flex: 1; }
+
+
+        /* --- OUTROS --- */
+        #retention-controls { border-left: 2px solid var(--cor-borda); padding-left: 12px; }
+        #total-sum-indicator { font-weight: bold; padding: 5px 10px; border-radius: 4px; font-size: 0.9rem; }
+        #total-sum-indicator.valid { color: var(--cor-valid-ok); }
+        #total-sum-indicator.invalid { color: var(--cor-valid-erro); }
+        .drag-over { background-color: #e9f5ff; border-color: var(--cor-primaria); border-style: dashed; }
+        #print-container { display: none; }
+
+        @media print {
+            .no-print { display: none !important; }
+            @page { size: A4 landscape; margin: 1cm; }
+            body { height: auto; overflow: visible; background-color: #fff; font-size: 9pt; }
+            #print-container { display: block; }
+            .print-table, .print-title-table { width: 100%; border-collapse: collapse; margin: 0 auto; }
+            .print-table { margin-top: 20px; }
+            .print-table th, .print-table td, .print-title-table th { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }
+            .print-main-header { font-size: 16pt; font-weight: bold; text-align: center; border: none; padding: 10px; background-color: #2c3e50 !important; color: white !important; }
+            .print-fortnight-header { background-color: #d4e6f1 !important; font-size: 11pt; font-weight: bold; text-align: center; }
+            .print-column-header td { background-color: #eaf2f8 !important; font-weight: bold; text-align: center; }
+            .print-column-header td:nth-child(1) { width: 5%; }
+            .print-column-header td:nth-child(2) { width: 35%; }
+            .print-column-header td:nth-child(3) { width: 60%; }
+            .print-week-header td { background-color: #f8f9fa !important; font-style: italic; }
+            .print-table .fortnight-tbody { page-break-inside: avoid; }
+            * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; }
+        }
+    </style>
+</head>
+<body>
+    <header class="no-print">
+        <div class="obra-controls">
+            <div class="control-group">
+                <label for="obra-select">Obra:</label>
+                <select id="obra-select"></select>
+                <button id="new-obra-btn" class="icon-btn" title="Nova Obra">+</button>
+                <button id="edit-obra-btn" class="icon-btn" title="Renomear Obra">✎</button>
+                <button id="delete-obra-btn" class="danger icon-btn" title="Excluir Obra">🗑️</button>
+            </div>
+        </div>
+        <div class="cronograma-controls">
+            <div class="control-group">
+                <label for="fortnight-qty">Quinzenas:</label>
+                <input type="number" id="fortnight-qty" value="0" min="0" max="32">
+            </div>
+            <div class="control-group">
+                <label for="start-date">Início da Obra:</label>
+                <input type="date" id="start-date">
+            </div>
+            <div class="control-group">
+                <label for="total-value">Valor Total (R$):</label>
+                <input type="number" id="total-value" step="1000" placeholder="0">
+            </div>
+            <div class="control-group">
+                <label for="distribution-mode">Distribuição:</label>
+                <select id="distribution-mode">
+                    <option value="equal">Dividir Igualmente</option>
+                    <option value="manual">Manual por Quinzena</option>
+                </select>
+                <span id="total-sum-indicator"></span>
+            </div>
+            <div class="control-group" id="retention-controls">
+                <label for="retain-value-check">
+                    <input type="checkbox" id="retain-value-check"> Reter valor
+                </label>
+                <input type="number" id="retained-amount" placeholder="Valor a reter" style="display: none;">
+            </div>
+            <div class="control-group" style="margin-left: auto;">
+                <button id="save-btn" class="secondary">Salvar</button>
+                <button id="print-btn" class="secondary">Imprimir</button>
+                <button id="reset-obra-btn" class="danger">Zerar Obra</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container no-print">
+        <aside id="main-list-panel">
+             <div class="panel-header">
+                <h2>Lista de Itens da Obra</h2>
+                <input type="search" id="search-items-input" placeholder="Pesquisar itens...">
+            </div>
+            <div id="main-list-controls">
+                <button id="manage-master-list-btn" class="secondary">Gerenciar Lista Mestra</button>
+            </div>
+            <form id="add-item-form" onsubmit="return false;">
+                <input type="text" id="new-item-c" placeholder="Adicionar Item (C) na Obra" required>
+                <input type="text" id="new-item-d" placeholder="Atividade (D)" required>
+                <button type="submit" id="add-item-btn">Adicionar na Obra</button>
+            </form>
+            <div id="main-list-container"></div>
+        </aside>
+        <section id="fortnights-panel"></section>
+    </main>
+    
+    <div id="print-container"></div>
+
+    <!-- Modal para Editar Item de Obra -->
+    <div id="edit-item-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px;">
+             <div class="modal-header">
+                <h2>Editar Item da Obra</h2>
+                <button class="close-modal danger icon-btn" data-modal-id="edit-item-modal" style="font-size: 1.5rem;">&times;</button>
+            </div>
+            <form id="edit-item-form" onsubmit="return false;">
+                <input type="hidden" id="edit-item-id">
+                <label for="edit-item-c">Item (C):</label>
+                <input type="text" id="edit-item-c" required>
+                <label for="edit-item-d">Atividade (D):</label>
+                <input type="text" id="edit-item-d" required>
+            </form>
+            <div class="modal-footer">
+                <button id="save-edit-item-btn">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Gerenciar Lista Mestra -->
+    <div id="master-list-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Gerenciar Lista Mestra</h2>
+                <button class="close-modal danger icon-btn" data-modal-id="master-list-modal" style="font-size: 1.5rem;">&times;</button>
+            </div>
+            <div class="modal-body" id="master-list-body">
+                <!-- Itens da lista mestra serão renderizados aqui -->
+            </div>
+            <div class="modal-footer">
+                <form id="new-master-item-form" onsubmit="return false;">
+                    <input type="text" id="new-master-c" placeholder="Novo Item (C)" required>
+                    <input type="text" id="new-master-d" placeholder="Nova Atividade (D)" required>
+                    <button type="submit">Adicionar à Mestra</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        
+        const ALL_DATA_KEY = 'allObrasData_v4';
+        
+        const initialItems = [{"c":"Limpeza e preparação inicial do terreno","d":"Roçada, remoção de entulho, nivelamento manual ou com retro, marcação da área útil."},{"c":"Implantação do canteiro provisório","d":"Instalação de abrigo de madeira para depósito de ferramentas e materiais."},{"c":"Sinalização e segurança do terreno","d":"Instalação da placa da obra e cercamento parcial com telhas ou tapumes simples."},{"c":"Organização do acesso e área de circulação interna","d":"Criação do acesso frontal (portão de acesso) e brita para demarcação de trilhas para circulação."},{"c":"Locação da obra conforme projeto arquitetônico","d":"Marcação de eixos principais, limites de recuo e pontos de fundação com uso de piquetes e linhas (esquadrejamento do terreno)."},{"c":"Instalações provisórias (condicionais)","d":"Solicitação de ligação de energia e água junto às concessionárias ou instalação parcial de reservatórios provisórios."},{"c":"Execução do muros de divisa lateral direita e fundos","d":"Alvenaria com cintas e pilares de arranque."},{"c":"Escavação das valas para fundação","d":"Escavação manual ou mecanizada conforme projeto estrutural."},{"c":"Montagem das formas e armação das vigas baldrames","d":"Montagem da armadura com espaçadores e formas de madeira compensada."},{"c":"Concretagem das vigas baldrames","d":"Concretagem com vibrador e nivelamento, cura com lona ou aditivo."},{"c":"Impermeabilização das vigas baldrames","d":"Pastilha adesiva, argamassa polimérica e proteção mecânica com chapisco ou cimento."},{"c":"Passagem das tubulações hidráulicas embutidas no solo","d":"Instalação dos ramais de esgoto e água para banheiros, cozinha e lavanderia embutidas no solo."},{"c":"Passagem das tubulações dos drenos","d":"Instalação das tubulações de dreno de ar-condicionado."},{"c":"Instalação dos conduítes e esperas elétricas embutidas no piso","d":"Passagem de conduítes da rede elétrica, TV, interfone e entrada da concessionária que vai para o quadro."},{"c":"Instalação das caixas de inspeção e esperas de esgoto","d":"Execução das caixas de inspeção e ligação inicial do sistema de esgoto."},{"c":"Preparação e compactação do subleito para piso bruto","d":"Compactação, brita e nivelamento com malha pop para receber concreto."},{"c":"Concretagem do piso bruto do térreo com malha pop","d":"Lançamento e acabamento do piso bruto, liberando para alvenaria."},{"c":"Alvenaria do pavimento térreo até 1,50m","d":"Assentamento de blocos, conferência de prumo, nível e esquadro."},{"c":"Execução de vergas e contra-vergas","d":"Armação e concretagem nos vãos de portas e janelas."},{"c":"Amarração das paredes e cintamento parcial","d":"Integração estrutural com graute, ferragens ou cintas, se previsto."},{"c":"Aberturas para eletrodutos","d":"Execução das passagens verticais dos eletrodutos embutidos nos blocos estruturais, com subida até as caixas de luz e quadro de distribuição, incluindo o chumbamento das caixas plásticas para reservas nas alvenarias conforme projeto elétrico."},{"c":"Alvenaria do pavimento térreo até altura da laje","d":"Assentamento de blocos, conferência de prumo, nível e esquadro."},{"c":"Aberturas para pontos hidráulicos","d":"Execução das passagens verticais das tubulações de água fria e dreno, com embutimento nos blocos estruturais até os pontos de consumo, conforme projeto hidráulico."},{"c":"Aberturas para registros hidráulicos","d":"Passagem das tubulações verticais até os pontos de registros nas paredes, com reserva embutida nos blocos estruturais para futura instalação dos registros conforme projeto hidráulico."},{"c":"Impermeabilização das primeiras fiadas","d":"Aplicação de produto impermeabilizante nas 3 primeiras fiadas das paredes do térreo."},{"c":"Escoramento das lajes","d":"Montagem das escoras verticais e travamentos das fôrmas das lajes, garantindo alinhamento e sustentação segura para a concretagem e cura do concreto, conforme especificações de projeto."},{"c":"Armação da laje de cobertura do primeiro pavimento","d":"Montagem da malha, negativos e espaçadores conforme projeto."},{"c":"Instalação das formas e ferragens da laje","d":"Fixação das formas laterais e reserva para escadas e shafts."},{"c":"Passagem de eletrodutos e caixas elétricas antes da concretagem","d":"Distribuição dos eletrodutos e caixas de passagem da rede elétrica."},{"c":"Concretagem da laje do 1º pavimento","d":"Lançamento do concreto com vibrador e cura com lona ou aditivo."},{"c":"Montagem e concretagem de 2 escadas","d":"Execução das fôrmas, armação das ferragens, escoramento, aplicação de desmoldante, concretagem e acabamento de 2 escadas interligando os pavimentos, conforme detalhamento estrutural."},{"c":"Reboco das áreas molhadas (cozinha e banheiros) do térreo","d":"Aplicação de argamassa nas paredes para posterior acabamento."},{"c":"Levantamento da alvenaria do 2º pavimento até 1,50 m","d":"Assentamento de blocos, conferência de prumo, nível e esquadro."},{"c":"Execução de vergas e contravergas do 2º pavimento","d":"Vergas sobre vãos de portas/janelas com ferro e concreto."},{"c":"Aberturas e vãos para esquadrias e caixonetes superiores","d":"Execução de vãos e instalação de esperas para portas e janelas."},{"c":"Execução das cintas de amarração do 2º pavimento","d":"Armação e concretagem das cintas estruturais."},{"c":"Montagem e concretagem de 2 escadas","d":"Execução das fôrmas, armação das ferragens, escoramento, aplicação de desmoldante, concretagem e acabamento de 2 escadas interligando os pavimentos, conforme detalhamento estrutural."},{"c":"Levantamento da alvenaria do 2º pavimento até altura da laje","d":"Assentamento de blocos, conferência de prumo, nível e esquadro até altura da laje."},{"c":"Aberturas para eletrodutos","d":"Execução das passagens verticais dos eletrodutos embutidos nos blocos estruturais, com subida até as caixas de luz e quadro de distribuição, incluindo o chumbamento das caixas plásticas para reservas nas alvenarias conforme projeto elétrico."},{"c":"Aberturas para pontos hidráulicos","d":"Execução das passagens verticais das tubulações de água fria e dreno, com embutimento nos blocos estruturais até os pontos de consumo, conforme projeto hidráulico."},{"c":"Aberturas para registros hidráulicos","d":"Passagem das tubulações verticais até os pontos de registros nas paredes, com reserva embutida nos blocos estruturais para futura instalação dos registros conforme projeto hidráulico."},{"c":"Escoramento das lajes","d":"Montagem das escoras verticais e travamentos das fôrmas das lajes, garantindo alinhamento e sustentação segura para a concretagem e cura do concreto, conforme especificações de projeto."},{"c":"Armação da laje de cobertura do segundo pavimento","d":"Montagem da malha, negativos e espaçadores conforme projeto."},{"c":"Instalação das formas e ferragens da laje","d":"Fixação das formas laterais."},{"c":"Passagem de eletrodutos e caixas elétricas antes da concretagem","d":"Distribuição dos eletrodutos e caixas de passagem da rede elétrica."},{"c":"Execução de alçapão","d":"Montagem da forma do alçapão para concretagem da laje."},{"c":"Concretagem da laje superior (telhado embutido)","d":"Lançamento do concreto com vibrador e cura com lona ou aditivo."},{"c":"Instalação da estrutura do telhado nas quatro casas","d":"Tesouras, calhas e estrutura metálica ou de madeira (sem telhas)"},{"c":"Início da instalação do quadro de luz do 2º pavimento","d":"Fixação do quadro, ligação das esperas e conduítes principais."},{"c":"Entrada do eletricista para passagem de fios instalação de 20% concluido","d":"Passagem dos circuitos principais pelas tubulações previamente instaladas."},{"c":"Impermeabilização da laje descoberta do segundo pavimento com manta líquida","d":"Aplicação de manta líquida em camadas cruzadas conforme fabricante, na laje descoberta do segundo pavimento."},{"c":"Instalação de esquadrias e caixonetes","d":"Instalação dos caixonetes das portas internas, visando a liberação do reboco com gesso, conforme alinhamento e projeto arquitetônico."},{"c":"Instalação das tubulações hidráulicas nas paredes","d":"Instalação dos registros de gaveta e pressão nos pontos definidos em banheiro e cozinha conforme projeto hidráulico."},{"c":"Instalação das tubulações de esgoto e ralos sanfonados","d":"Posicionamento dos pontos de coleta de água e esgoto."},{"c":"Instalação das tubulações hidráulicas nas paredes superiores","d":"Instalação dos registros de gaveta e pressão nos pontos definidos nos banheiros conforme projeto hidráulico."},{"c":"Instalação das tubulações de esgoto e ralos sanfonados no 2º pavimento","d":"Posicionamento dos pontos de coleta de água e esgoto."},{"c":"Colocação dos peitoris das janelas das casas","d":"Assentamento e nivelamento com granito/mármore."},{"c":"Instalação das soleiras das portas","d":"Divisão dos ambientes com acabamento em granito."},{"c":"Colocação do requadro em granito dos basculhantes do banheiro","d":"Assentamento e nivelamento com granito/mármore."},{"c":"Reboco das áreas molhadas (banheiros) do 2º pavimento","d":"Aplicação de argamassa nas paredes para posterior acabamento."},{"c":"Instalação da caixa d’água em polietileno","d":"Fixação da base, instalação da caixa de polietileno conforme dimensionamento do projeto hidráulico, interligação dos tubos de entrada, saída e extravasamento, e vedação das conexões."},{"c":"Execução da empenas do telhado","d":"Assentamento dos blocos da empena."},{"c":"Reboco interno das empenas do telhado","d":"Aplicação de argamassa nas paredes para posterior acabamento."},{"c":"Intalação das pingadeiras","d":"Assentamento das pingadeiras com argamassa."},{"c":"Instalação da estrutura do telhado nas quatro casas","d":"Tesouras, calhas e estrutura metálica ou de madeira (sem telhas)"},{"c":"Telhamento das quatro casas com telhado embutido","d":"Instalação de telhas, cumeeiras, rufos, calhas e arremates finais."},{"c":"Passagem de fios elétricos 80% concluido","d":"Conexão dos circuitos internos aos quadros."},{"c":"Entrada do gesseiro para reboco das paredes e tetos","d":"Execução de reboco de gesso nas paredes e teto."},{"c":"Execução do rebaixo de gesso na sala e cozinha","d":"Colocação das placas e acabamento do teto rebaixado."},{"c":"Instalação das molduras de gesso nas portas e janelas","d":"Fixação e acabamento em gesso nas esquadrias internas."},{"c":"Marcação e escavação das fundações da edícula","d":"Preparação do solo e concretagem dos blocos de fundação."},{"c":"Alvenaria da edícula","d":"Assentamento dos blocos da edícula até altura da laje com vergas e contravergas."},{"c":"Marcação e escavação das fundações do muro de contenção","d":"Preparação do solo e concretagem dos blocos de fundação."},{"c":"Alvenaria do muro de contenção (até altura de 1,20m)","d":"Assentamento dos blocos até 1,20 m, preparo para impermeabilização externa futura e instalação de armadura e concretagem do interior dos mesmos."},{"c":"Continuação do gesseiro para reboco das paredes e tetos","d":"Conclusão do reboco de gesso nas paredes e teto."},{"c":"Cobertura da edícula (telha aparente ou laje + impermeabilização)","d":"Instalação da estrutura da cobertura ou concretagem da laje com manta líquida."},{"c":"instalação dos registros hidráulicos nas edículas","d":"Instalação dos registros de gaveta e pressão nos pontos definidos em banheiros, cozinha, lavanderia e área gourmet, conforme projeto hidráulico."},{"c":"Instalação das tubulações de esgoto e ralos sanfonados","d":"Posicionamento dos pontos de coleta de água e esgoto das edículas."},{"c":"Reboco das edículas","d":"Aplicação de argamassa nas paredes para posterior acabamento."},{"c":"Execução do contrapiso nas casas","d":"Lançamento de argamassa de regularização com caimento."},{"c":"Execução do contrapiso na edícula","d":"Nivelamento e aplicação da base de argamassa."},{"c":"Início do reboco das fachadas externas","d":"Reboco das áreas externas das casas."},{"c":"Término da passagem de fios elétricos 100% concluido","d":"Conexão dos circuitos internos aos quadros, incluindo edículas e fechamento no quadro externo."},{"c":"Continuação dos rebocos das fachadas","d":"Término do reboco das áreas externas das casas."},{"c":"Reboco interno e externo da edícula","d":"Aplicação final de argamassa nas superfícies."},{"c":"Preparo da base para assentamento de bancadas e louças","d":"Marcação e proteção das áreas para pias, lavatórios, vasos."},{"c":"Instalação das portas de entrada das casas","d":"Fixação dos batentes e portas principais."},{"c":"Instalação dos revestimentos cerâmicos nas casas (pavimento superior).","d":"Assentamento do revestimento cerâmico ou porcelanato no 2º pavimento."},{"c":"Preparo das paredes e teto para pintura","d":"Lixamento e aplicação de selador nas paredes e teto do 2º pavimento."},{"c":"Instalação dos revestimentos cerâmicos nas casas (pavimento térreo).","d":"Assentamento do revestimento cerâmicos ou porcelanato no pavimento térreo."},{"c":"Instalação de bancadas e lavatórios","d":"Cozinhas e banheiros."},{"c":"Instalação de vasos sanitários com caixa acoplada","d":"Fixação e vedação dos vasos com testes de funcionamento."},{"c":"Instalação de louças, sifão e rabicho","d":"Instalação de sifões, torneiras e rabichos."},{"c":"Preparo das paredes e teto para pintura","d":"Lixamento e aplicação de selador nas paredes e teto do pavimento térreo."},{"c":"Instalação de portas internas (com alizares)","d":"Colocação das folhas de porta, dobradiças, maçanetas e alizares."},{"c":"Preparo das portas para o verniz","d":"Aplicação de selador para madeiras nas portas e lixamento das mesmas."},{"c":"Instalação dos revestimentos cerâmicos nas edículas","d":"Assentamento do revestimento cerâmicos ou porcelanato nas edículas."},{"c":"Início da execução dos muros de divisa","d":"Alvenaria com cintas e pilares de arranque."},{"c":"Instalação de pias, bancadas e lavatórios","d":"Area gourmet, lavabo e lavanderia."},{"c":"Instalação de vasos sanitários com caixa acoplada no lavabo da edícula","d":"Fixação e vedação dos vasos com testes de funcionamento."},{"c":"Instalação de louças, sifão e rabicho","d":"Instalação de sifões, torneiras e rabichos."},{"c":"Execução da churrasqueira","d":"Execução da churrasqueira incluindo (montagem, revestimento e instalação de acessórios)"},{"c":"Revisão hidráulica (testes de vazamento e funcionamento)","d":"Testes de estanqueidade e ajustes hidráulicos finos."},{"c":"Instalação do rebaixo de gesso na edícula (se aplicável)","d":"Execução conforme projeto com acabamento de molduras e placas."},{"c":"Pintura da edícula (se aplicável)","d":"Pintura de acabamento das edículas finalizados (caso houver)"},{"c":"Revisão e selagem de rejuntes e rodapés","d":"Rejuntes, calafetagens e correções em rodapés, bancadas e rejuntes."},{"c":"Instalação de espelhos e acessórios em banheiros","d":"Fixação de espelhos, suportes de papel, toalheiros, saboneteiras etc."},{"c":"Pintura interna das casas 1ª demão e 2ª demão","d":"Pintura com rolo ou compressor nas superfícies internas."},{"c":"Aplicação de verniz nas portas das casas e do lavabo da edícula","d":"Aplicação de 2(duas) demãos de verniz nas portas das casas e do lavabo da edícula."},{"c":"Fechamento das instalações elétricas (interruptores e tomadas)","d":"Instalação das tampas e finalização das conexões elétricas."},{"c":"Instalação de acessórios elétricos (plafons, luminárias, ventiladores)","d":"Fixação de luminárias, plafons, spots e ventiladores de teto."},{"c":"Instalação de caixas de gordura, fossa, filtro e sumidouro","d":"Escavação e montagem das caixas com conexões e tubos."},{"c":"Finalização da rede externa de esgoto","d":"Ligação final da rede interna com rede pública ou sumidouro."},{"c":"Instalação de duchas e misturadores","d":"Fixação das duchas nos banheiros com testes de vazão."},{"c":"Revisão completa da rede hidráulica (testes finais)","d":"Realização de testes em todos os pontos de água e esgoto."},{"c":"Instalação das tampas de caixas e grelhas externas","d":"Colocação de tampas e grelhas de acabamento nas áreas externas."},{"c":"Limpeza geral das tubulações e reservatórios","d":"Limpeza de caixas d’água, caixa de gordura e linhas hidráulicas."},{"c":"Verificação do funcionamento geral do sistema hidráulico","d":"Verificação de pressão, vazão e estanqueidade em toda a rede."},{"c":"Instalações de acabamento hidráulicos","d":"Instalações de acabamentos dos registros (banheiros, cozinhas e edículas)"},{"c":"Execução do reboco externo dos muros","d":"Aplicação de chapisco, emboço e reboco nas paredes dos muros."},{"c":"Execução das calçadas externas","d":"Nivelamento do solo, formas, concretagem e rampas."},{"c":"Execução de acabamento das calçadas externas","d":"Execução do contrapiso com concreto e faixas nas calçadas."},{"c":"Preparação da fachada para pintura (limpeza e selador)","d":"Lixamento, limpeza e aplicação de selador acrílico."},{"c":"Pintura externa das casas (1ª e 2ª demão)","d":"Aplicação das duas demãos de tinta acrílica externa."},{"c":"Pintura dos muros de divisa e frente","d":"Pintura de acabamento dos muros com cor definida."},{"c":"Instalação de interfone e caixa de correspondência","d":"Fixação do sistema de interfone e suporte de cartas."},{"c":"Instalação de refletores externos e iluminação de fachada","d":"Instalação de refletores com sensores de presença e iluminação decorativa."},{"c":"Revisão visual e ajustes em fissuras e cantoneiras externas","d":"Correções em trincas, acabamentos e uniformização visual."},{"c":"Limpeza geral externa e organização do entorno","d":"Varrição, remoção de resíduos e ordenamento do entorno da obra."},{"c":"Instalação de números residenciais e placas de identificação","d":"Fixação de números e placas nas casas e fachada frontal."},{"c":"Revisão final de pintura externa (fachadas e muros)","d":"Retoques de pintura em pontos danificados e ajustes finos."},{"c":"Ajustes finais em esquadrias, dobradiças e trincos","d":"Ajustes em janelas, portas externas e ferragens em geral."},{"c":"Correção de rejuntes externos, peitoris e soleiras","d":"Rejuntes e rejuntamentos em pontos externos mal acabados."},{"c":"Lavagem externa das fachadas e vidros","d":"Lavagem das fachadas, janelas, portas e esquadrias."},{"c":"Revisão e fixação de caixas de energia e quadros","d":"Conferência e fixação das caixas e quadros elétricos."},{"c":"Limpeza final das calçadas e áreas comuns externas","d":"Varrição, lavagem e limpeza de todas as áreas externas da obra."},{"c":"Organização do canteiro para retirada de entulho e sobras","d":"Recolhimento de resíduos, materiais sobressalentes e entulhos."},{"c":"Teste final dos sistemas (elétrico, hidráulico, esgoto)","d":"Testes completos de funcionamento de luz, torneiras, descargas e ralos."},{"c":"Limpeza fina nas áreas internas (pré-entrega)","d":"Limpeza detalhada dos ambientes internos para preparação da entrega."},{"c":"Início da Jardinagem e nivelamento do terreno frontal e posterior","d":"Limpeza do solo, retirada de entulhos leves e plantio de grama ou cobertura vegetal nas áreas externas definidas no projeto (quando aplicável)"},{"c":"Término da Jardinagem","d":"Plantio de grama ou cobertura vegetal nas áreas externas definidas no projeto (quando aplicável)"},{"c":"Correções de pintura","d":"Retoques simples."},{"c":"Revisão de portas e janelas","d":"Ajustes básicos."},{"c":"Revisão de pisos e rejuntes","d":"Correção de falhas."},{"c":"Substituição de peças soltas/danificadas","d":"Tomadas, torneiras."},{"c":"Testes hidráulicos","d":"Registros e válvulas."},{"c":"Testes elétricos","d":"Ponto de luz e disjuntres."},{"c":"Limpeza pós-correção","d":"Retirada de resíduos."},{"c":"Organização do ambiente","d":"Preparação para entrega."},{"c":"Check-list de termo de entrega provisório (vistoria técnica)","d":"Realização de vistoria técnica com checklist de pendencias."},{"c":"Execução das pendencias da vistoria técnica de acordo com o checklist de entrega provisória","d":"Realização das pendencias da vistoria técnica com checklist da entrega provisória."},{"c":"Checklist final (vistoria técnica)","d":"Vistoria geral para entrega da obra."},{"c":"Checklist final com o contratante (vistoria técnica)","d":"Vistoria geral para liberação de pagamento."},{"c":"Execução das pendencias da vistoria técnica com o contratante (caso houver)","d":"Para liberação de pagamento."},{"c":"Liberação da retenção contratual","d":"Entrega de documentação final (termo de entrega de obra), aceite da obra pelo contratante e liberação do pagamento retido."}];
+
+        let allData = {
+            masterList: [],
+            obras: {},
+            currentObra: null
+        };
+
+        const getBlankState = () => ({
+            mainList: JSON.parse(JSON.stringify(allData.masterList)).map((item, index) => ({...item, id: crypto.randomUUID(), originalIndex: index })),
+            fortnights: [],
+            fortnightCount: 0,
+            startDate: '',
+            totalValue: 0,
+            distributionMode: 'equal',
+            fortnightValues: [],
+            retainValue: false,
+            retainedAmount: 0,
+        });
+
+        const getEl = (id) => document.getElementById(id);
+        const obraSelect = getEl('obra-select'), newObraBtn = getEl('new-obra-btn'), editObraBtn = getEl('edit-obra-btn'), deleteObraBtn = getEl('delete-obra-btn');
+        const fortnightQtyInput = getEl('fortnight-qty'), saveBtn = getEl('save-btn'), printBtn = getEl('print-btn');
+        const addItemForm = getEl('add-item-form'), newItemCInput = getEl('new-item-c'), newItemDInput = getEl('new-item-d');
+        const mainListContainer = getEl('main-list-container'), fortnightsPanel = getEl('fortnights-panel');
+        const manageMasterListBtn = getEl('manage-master-list-btn');
+        const startDateInput = getEl('start-date'), totalValueInput = getEl('total-value');
+        const distributionModeSelect = getEl('distribution-mode'), totalSumIndicator = getEl('total-sum-indicator');
+        const retainValueCheck = getEl('retain-value-check'), retainedAmountInput = getEl('retained-amount');
+        const resetObraBtn = getEl('reset-obra-btn');
+        const editItemModal = getEl('edit-item-modal'), saveEditItemBtn = getEl('save-edit-item-btn');
+        const editItemIdInput = getEl('edit-item-id'), editItemCInput = getEl('edit-item-c'), editItemDInput = getEl('edit-item-d');
+        const masterListModal = getEl('master-list-modal'), masterListBody = getEl('master-list-body'), newMasterItemForm = getEl('new-master-item-form');
+        const searchItemsInput = getEl('search-items-input');
+        const printContainer = getEl('print-container');
+        
+        // --- DATES & FINANCIALS ---
+        function formatDate(date) {
+            return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+        
+        function formatCurrency(value) { return (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+
+        // --- DATA MANAGEMENT ---
+
+        function getCurrentState() {
+            if (!allData.currentObra || !allData.obras[allData.currentObra]) return null;
+            return allData.obras[allData.currentObra];
+        }
+
+        function saveAllData() {
+            localStorage.setItem(ALL_DATA_KEY, JSON.stringify(allData));
+        }
+
+        function loadAllData() {
+            const savedData = localStorage.getItem(ALL_DATA_KEY);
+            if (savedData) {
+                allData = JSON.parse(savedData);
+                if (!allData.masterList || allData.masterList.length === 0) { // Compatibility for older versions
+                     allData.masterList = initialItems.map((item, index) => ({...item, masterId: `master_${index}`}));
+                }
+            } else {
+                // First time load
+                allData.masterList = initialItems.map((item, index) => ({...item, masterId: `master_${index}`}));
+                const firstObraName = "Minha Primeira Obra";
+                allData.obras[firstObraName] = getBlankState();
+                allData.currentObra = firstObraName;
+            }
+
+            if (!allData.currentObra || !allData.obras[allData.currentObra]) {
+                allData.currentObra = Object.keys(allData.obras)[0] || null;
+            }
+        }
+
+        // --- RENDER FUNCTIONS ---
+
+        function fullRender() {
+            renderObraControls();
+            const state = getCurrentState();
+            if (!state) {
+                fortnightsPanel.innerHTML = '<p style="padding: 20px; color: #6c757d;">Crie ou selecione uma obra para começar.</p>';
+                mainListContainer.innerHTML = '';
+                document.querySelector('.cronograma-controls').style.opacity = '0.5';
+                document.querySelector('.cronograma-controls').style.pointerEvents = 'none';
+                return;
+            }
+            
+            document.querySelector('.cronograma-controls').style.opacity = '1';
+            document.querySelector('.cronograma-controls').style.pointerEvents = 'auto';
+
+            fortnightQtyInput.value = state.fortnightCount;
+            startDateInput.value = state.startDate;
+            totalValueInput.value = state.totalValue;
+            distributionModeSelect.value = state.distributionMode;
+            retainValueCheck.checked = state.retainValue;
+            retainedAmountInput.value = state.retainedAmount;
+            retainedAmountInput.style.display = state.retainValue ? 'inline-block' : 'none';
+            
+            renderApp(state);
+        }
+
+        function renderApp(state) {
+            const fortnightDates = calculateFortnightDates(state);
+            renderMainList(state);
+            renderFortnights(state, fortnightDates);
+            updateManualSumIndicator(state);
+        }
+        
+        function renderObraControls() {
+            obraSelect.innerHTML = '';
+            const obraNames = Object.keys(allData.obras);
+            if (obraNames.length === 0) {
+                 const option = document.createElement('option');
+                 option.textContent = "Nenhuma obra encontrada";
+                 obraSelect.appendChild(option);
+            } else {
+                obraNames.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    if (name === allData.currentObra) {
+                        option.selected = true;
+                    }
+                    obraSelect.appendChild(option);
+                });
+            }
+        }
+
+        function renderMainList(state) {
+            mainListContainer.innerHTML = '';
+            const searchTerm = searchItemsInput.value.toLowerCase();
+            const itemsInFortnights = new Set(state.fortnights.flat().map(item => item.id));
+
+            const availableItems = state.mainList.filter(item => {
+                const isInFortnight = itemsInFortnights.has(item.id);
+                const matchesSearch = item.c.toLowerCase().includes(searchTerm) || item.d.toLowerCase().includes(searchTerm);
+                return !isInFortnight && matchesSearch;
+            });
+
+            availableItems.sort((a,b) => a.originalIndex - b.originalIndex);
+            availableItems.forEach(item => mainListContainer.appendChild(createItemCard(item, 'main')));
+        }
+
+        function renderFortnights(state, fortnightDates) {
+            fortnightsPanel.innerHTML = '';
+            for (let i = 0; i < state.fortnightCount; i++) {
+                const column = document.createElement('div');
+                column.className = 'fortnight-column';
+                
+                const header = document.createElement('div');
+                header.className = 'fortnight-header';
+                header.innerHTML = `<h3>Quinzena ${i + 1} <span class="date-range">${fortnightDates[i].start} a ${fortnightDates[i].end}</span></h3>`;
+                
+                const financialsDiv = document.createElement('div');
+                financialsDiv.className = 'fortnight-financials';
+                
+                const valueSpan = document.createElement('span');
+                valueSpan.className = 'value-display';
+                valueSpan.textContent = `Valor: ${formatCurrency(state.fortnightValues[i])}`;
+                financialsDiv.appendChild(valueSpan);
+                
+                if (state.distributionMode === 'manual' && !(state.retainValue && i === state.fortnightCount - 1)) {
+                    valueSpan.onclick = () => {
+                        const input = document.createElement('input');
+                        input.type = 'number';
+                        input.value = state.fortnightValues[i] || 0;
+                        input.onblur = () => {
+                            state.fortnightValues[i] = parseFloat(input.value) || 0;
+                            fullRender();
+                            saveAllData();
+                        };
+                        input.onkeydown = (e) => { if(e.key === 'Enter') input.blur(); };
+                        financialsDiv.replaceChild(input, valueSpan);
+                        input.focus();
+                    };
+                } else {
+                    valueSpan.style.cursor = 'default';
+                    valueSpan.style.backgroundColor = 'transparent';
+                }
+
+                header.appendChild(financialsDiv);
+                
+                const itemsContainer = document.createElement('div');
+                itemsContainer.className = 'fortnight-items';
+                itemsContainer.dataset.fortnightIndex = i;
+                ['dragover', 'dragleave', 'drop'].forEach(evt => itemsContainer.addEventListener(evt, handleDragDrop));
+
+                if (state.fortnights[i]) {
+                    state.fortnights[i].forEach(item => itemsContainer.appendChild(createItemCard(item, 'fortnight')));
+                }
+                
+                column.appendChild(header);
+                column.appendChild(itemsContainer);
+                fortnightsPanel.appendChild(column);
+            }
+        }
+
+        function createItemCard(item, location) {
+            const card = document.createElement('div');
+            card.className = 'item-card';
+            card.draggable = true;
+            card.dataset.itemId = item.id;
+            const codeSpan = item.code ? `<span class="code">[${item.code}] </span>` : '';
+            card.innerHTML = `<strong>${codeSpan}${item.c}</strong><p>${item.d}</p>`;
+
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'item-actions';
+            
+            const menuBtn = document.createElement('button');
+            menuBtn.className = 'action-btn menu-btn';
+            menuBtn.innerHTML = '&#8942;'; // Three dots icon
+            menuBtn.onclick = (e) => {
+                e.stopPropagation();
+                toggleItemMenu(card, item);
+            };
+            actionsDiv.appendChild(menuBtn);
+
+            if (location === 'fortnight') {
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'action-btn remove-item-btn';
+                removeBtn.innerHTML = '&times;';
+                removeBtn.title = 'Remover da quinzena';
+                removeBtn.onclick = () => handleRemoveItem(item.id);
+                actionsDiv.appendChild(removeBtn);
+            }
+            card.appendChild(actionsDiv);
+            card.addEventListener('dragstart', handleDragDrop);
+            return card;
+        }
+
+        function calculateFortnightDates(state) {
+            const dates = [];
+            const count = state.fortnightCount > 0 ? state.fortnightCount : 0;
+            if (!state.startDate) return Array.from({ length: count }, () => ({start: 'N/D', end: 'N/D'}));
+            let currentStartDate = new Date(state.startDate + 'T00:00:00');
+            for (let i = 0; i < count; i++) {
+                if (i > 0) {
+                    currentStartDate.setDate(currentStartDate.getDate() + (8 - currentStartDate.getDay()) % 7);
+                }
+                let endDate = new Date(currentStartDate);
+                endDate.setDate(endDate.getDate() + (5 - endDate.getDay() + 7) % 7 + 7);
+                dates.push({ start: formatDate(new Date(currentStartDate)), end: formatDate(endDate) });
+                currentStartDate = new Date(endDate);
+            }
+            return dates;
+        }
+        
+        function distributeValues(state) {
+            const distributableValue = state.retainValue ? state.totalValue - state.retainedAmount : state.totalValue;
+            const distributionCount = state.retainValue ? state.fortnightCount - 1 : state.fortnightCount;
+
+            if (distributionCount <= 0) { 
+                state.fortnightValues = Array(state.fortnightCount).fill(0);
+                if(state.retainValue) state.fortnightValues[state.fortnightCount - 1] = state.retainedAmount;
+                return;
+            }
+
+            if (state.distributionMode === 'equal') {
+                const equalValue = distributableValue / distributionCount;
+                for (let i = 0; i < distributionCount; i++) {
+                    state.fortnightValues[i] = equalValue;
+                }
+            }
+            
+            if (state.retainValue) {
+                state.fortnightValues[state.fortnightCount - 1] = state.retainedAmount;
+            }
+        }
+        
+        function updateManualSumIndicator(state) {
+            const currentSum = state.fortnightValues.reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
+            if(state.distributionMode !== 'manual') {
+                totalSumIndicator.textContent = '';
+                return;
+            }
+            totalSumIndicator.textContent = `Soma: ${formatCurrency(currentSum)}`;
+            totalSumIndicator.className = Math.abs(currentSum - state.totalValue) < 0.01 ? 'valid' : 'invalid';
+        }
+        
+        function reIndexFortnight(state, fortnightIndex) {
+            if (state.fortnights[fortnightIndex]) {
+                state.fortnights[fortnightIndex].forEach((item, index) => {
+                    item.code = `${fortnightIndex + 1}.${index + 1}`;
+                });
+            }
+        }
+
+        // --- DRAG & DROP AND ITEM MANIPULATION ---
+        let draggedElement = null;
+        const handleDragDrop = (e) => {
+            const state = getCurrentState();
+            if (!state) return;
+
+            switch(e.type) {
+                case 'dragstart':
+                    draggedElement = e.target;
+                    e.dataTransfer.setData('text/plain', e.target.dataset.itemId);
+                    setTimeout(() => e.target.classList.add('dragging'), 0);
+                    closeAllMenus();
+                    break;
+                case 'dragover': e.preventDefault(); e.currentTarget.classList.add('drag-over'); break;
+                case 'dragleave': e.currentTarget.classList.remove('drag-over'); break;
+                case 'drop':
+                    e.preventDefault();
+                    e.currentTarget.classList.remove('drag-over');
+                    if (draggedElement) draggedElement.classList.remove('dragging');
+                    const itemId = e.dataTransfer.getData('text/plain');
+                    const { item, originList, originIndex, originFortnightIndex } = findItemAndOrigin(itemId, state);
+                    if (!item) return;
+                    
+                    if (typeof originFortnightIndex === 'number') {
+                        originList.splice(originIndex, 1);
+                        reIndexFortnight(state, originFortnightIndex);
+                    }
+
+                    const dropTarget = e.currentTarget;
+                    if (dropTarget.id === 'main-list-container' || dropTarget.closest('#main-list-panel')) {
+                         delete item.code;
+                    } else {
+                        const fortnightIndex = parseInt(dropTarget.closest('.fortnight-column').querySelector('.fortnight-items').dataset.fortnightIndex);
+                        if (!state.fortnights[fortnightIndex].find(i => i.id === item.id)) {
+                             state.fortnights[fortnightIndex].push(item);
+                        }
+                        reIndexFortnight(state, fortnightIndex);
+                    }
+                    fullRender();
+                    saveAllData();
+                    break;
+            }
+        };
+
+        function findItemAndOrigin(itemId, state) {
+            for (let i = 0; i < state.fortnights.length; i++) {
+                if (state.fortnights[i]) {
+                    const originIndex = state.fortnights[i].findIndex(it => it.id === itemId);
+                    if (originIndex > -1) return { item: state.fortnights[i][originIndex], originList: state.fortnights[i], originIndex, originFortnightIndex: i };
+                }
+            }
+            const originIndex = state.mainList.findIndex(i => i.id === itemId);
+            if (originIndex > -1) {
+                return { item: state.mainList[originIndex], originList: state.mainList, originIndex, originFortnightIndex: null };
+            }
+            return {};
+        }
+
+
+        function handleRemoveItem(itemId) {
+            const state = getCurrentState();
+            const { item, originList, originIndex, originFortnightIndex } = findItemAndOrigin(itemId, state);
+            if (!item) return;
+
+            originList.splice(originIndex, 1);
+            if (typeof originFortnightIndex === 'number') {
+                reIndexFortnight(state, originFortnightIndex);
+            }
+            
+            delete item.code;
+            fullRender();
+            saveAllData();
+        }
+
+        function handleDuplicateItem(itemId) {
+            const state = getCurrentState();
+            const { item, originList, originIndex, originFortnightIndex } = findItemAndOrigin(itemId, state);
+            if (!item) return;
+
+            const newItem = JSON.parse(JSON.stringify(item));
+            newItem.id = crypto.randomUUID();
+            delete newItem.code;
+            
+            newItem.originalIndex = item.originalIndex + 0.5; 
+            
+            state.mainList.push(newItem);
+            state.mainList.sort((a,b) => a.originalIndex - b.originalIndex);
+            state.mainList.forEach((i, idx) => i.originalIndex = idx);
+
+            if (typeof originFortnightIndex === 'number') {
+                originList.splice(originIndex + 1, 0, newItem);
+                reIndexFortnight(state, originFortnightIndex);
+            }
+            
+            fullRender();
+            saveAllData();
+        }
+
+        function handleDeleteItemFromObra(itemId) {
+            const state = getCurrentState();
+            const { item } = findItemAndOrigin(itemId, state);
+            if (!item) return;
+
+            if (confirm(`Tem certeza que deseja apagar o item "${item.c}" desta obra? A ação é permanente.`)) {
+                const mainListIndex = state.mainList.findIndex(i => i.id === itemId);
+                if (mainListIndex > -1) {
+                    state.mainList.splice(mainListIndex, 1);
+                }
+
+                for (let i = 0; i < state.fortnights.length; i++) {
+                    const itemIndexInFortnight = state.fortnights[i].findIndex(it => it.id === itemId);
+                    if (itemIndexInFortnight > -1) {
+                        state.fortnights[i].splice(itemIndexInFortnight, 1);
+                        reIndexFortnight(state, i);
+                        break; 
+                    }
+                }
+                
+                fullRender();
+                saveAllData();
+            }
+        }
+        
+        function updateFortnightArray(state) {
+            const newCount = state.fortnightCount;
+            const currentCount = state.fortnights.length;
+            if (newCount > currentCount) {
+                const newArrays = Array.from({ length: newCount - currentCount }, () => []);
+                state.fortnights.push(...newArrays);
+                state.fortnightValues.push(...Array(newCount - currentCount).fill(0));
+            } else if (newCount < currentCount) {
+                state.fortnights.splice(newCount);
+                state.fortnightValues.splice(newCount);
+            }
+        }
+        
+        function handleStateUpdate() {
+            const state = getCurrentState();
+            if (!state) return;
+            updateFortnightArray(state);
+            distributeValues(state);
+            renderApp(state);
+            saveAllData();
+        }
+
+        function toggleItemMenu(card, item) {
+            closeAllMenus();
+            let menu = card.querySelector('.item-menu');
+            if (!menu) {
+                menu = document.createElement('div');
+                menu.className = 'item-menu';
+                menu.innerHTML = `
+                    <button class="edit-btn">Editar</button>
+                    <button class="duplicate-btn">Duplicar</button>
+                    <button class="delete-btn">Apagar da Obra</button>
+                `;
+                card.appendChild(menu);
+                menu.querySelector('.edit-btn').onclick = () => openEditModal(item);
+                menu.querySelector('.duplicate-btn').onclick = () => handleDuplicateItem(item.id);
+                menu.querySelector('.delete-btn').onclick = () => handleDeleteItemFromObra(item.id);
+            }
+            menu.style.display = 'block';
+        }
+
+        function closeAllMenus(exceptCard = null) {
+            document.querySelectorAll('.item-menu').forEach(menu => {
+                if (!exceptCard || !exceptCard.contains(menu)) {
+                    menu.style.display = 'none';
+                }
+            });
+        }
+
+        function openEditModal(item) {
+            closeAllMenus();
+            const state = getCurrentState();
+            const itemToEdit = findItemAndOrigin(item.id, state).item;
+            editItemIdInput.value = itemToEdit.id;
+            editItemCInput.value = itemToEdit.c;
+            editItemDInput.value = itemToEdit.d;
+            editItemModal.style.display = 'flex';
+        }
+
+        // --- PRINT ---
+        function generatePrintView() {
+            const state = getCurrentState();
+            if (!state) {
+                alert("Nenhuma obra selecionada para imprimir.");
+                return;
+            }
+            const fortnightDates = calculateFortnightDates(state);
+            let titleTable = `<table class="print-title-table"><tr><th class="print-main-header">CRONOGRAMA FÍSICO-FINANCEIRO - ${allData.currentObra}</th></tr></table>`;
+            let contentTable = `<table class="print-table">`;
+            for (let i = 0; i < state.fortnightCount; i++) {
+                const items = state.fortnights[i] || [];
+                const value = formatCurrency(state.fortnightValues[i]);
+                const percent = state.totalValue > 0 ? ((state.fortnightValues[i] || 0) / state.totalValue * 100).toFixed(1) + '%' : '0%';
+                contentTable += `<tbody class="fortnight-tbody"><tr><th colspan="3" class="print-fortnight-header">Quinzena ${String(i + 1).padStart(2, '0')} - ${fortnightDates[i].start} a ${fortnightDates[i].end} - ${percent} do valor da obra (${value})</th></tr><tr class="print-column-header"><td>Item</td><td>Descrição</td><td>Atividades</td></tr>`;
+                const midPoint = Math.ceil(items.length / 2);
+                if(items.length > 0) {
+                    contentTable += `<tr class="print-week-header"><td colspan="3">1ª Semana</td></tr>`;
+                    items.slice(0, midPoint).forEach(item => { contentTable += `<tr><td>${item.code || ''}</td><td>${item.c}</td><td>${item.d}</td></tr>`; });
+                    if(midPoint < items.length) {
+                        contentTable += `<tr class="print-week-header"><td colspan="3">2ª Semana</td></tr>`;
+                        items.slice(midPoint).forEach(item => { contentTable += `<tr><td>${item.code || ''}</td><td>${item.c}</td><td>${item.d}</td></tr>`; });
+                    }
+                } else { contentTable += `<tr><td colspan="3" style="text-align:center;font-style:italic;">Nenhuma atividade nesta quinzena.</td></tr>`; }
+                contentTable += `</tbody>`;
+            }
+            contentTable += `</table>`;
+            printContainer.innerHTML = titleTable + contentTable;
+            window.print();
+        }
+        
+        function renderMasterList() {
+            masterListBody.innerHTML = '';
+            allData.masterList.forEach((item, index) => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'master-item';
+                itemEl.draggable = true;
+                itemEl.dataset.index = index;
+                itemEl.innerHTML = `
+                    <div class="master-item-content">
+                        <strong>${item.c}</strong>
+                        <p>${item.d}</p>
+                    </div>
+                    <button class="icon-btn edit-master-btn" title="Editar">✎</button>
+                    <button class="icon-btn duplicate-master-btn" title="Duplicar">⎘</button>
+                    <button class="icon-btn danger delete-master-btn" title="Excluir">🗑️</button>
+                `;
+                masterListBody.appendChild(itemEl);
+
+                itemEl.querySelector('.edit-master-btn').addEventListener('click', () => editMasterItem(index));
+                itemEl.querySelector('.duplicate-master-btn').addEventListener('click', () => duplicateMasterItem(index));
+                itemEl.querySelector('.delete-master-btn').addEventListener('click', () => deleteMasterItem(index));
+                
+                itemEl.addEventListener('dragstart', handleMasterDragStart);
+                itemEl.addEventListener('dragover', (e) => e.preventDefault());
+                itemEl.addEventListener('drop', handleMasterDrop);
+            });
+        }
+        
+        let draggedMasterIndex = null;
+        function handleMasterDragStart(e) {
+            draggedMasterIndex = parseInt(e.currentTarget.dataset.index);
+        }
+
+        function handleMasterDrop(e) {
+            e.preventDefault();
+            const targetIndex = parseInt(e.currentTarget.dataset.index);
+            if (draggedMasterIndex === targetIndex) return;
+
+            const draggedItem = allData.masterList.splice(draggedMasterIndex, 1)[0];
+            allData.masterList.splice(targetIndex, 0, draggedItem);
+            
+            saveAllData();
+            renderMasterList();
+        }
+
+        function editMasterItem(index) {
+            const item = allData.masterList[index];
+            const newC = prompt("Editar Item (C):", item.c);
+            if (newC === null) return;
+            const newD = prompt("Editar Atividade (D):", item.d);
+            if (newD === null) return;
+
+            item.c = newC;
+            item.d = newD;
+            saveAllData();
+            renderMasterList();
+        }
+
+        function duplicateMasterItem(index) {
+            const itemToDuplicate = JSON.parse(JSON.stringify(allData.masterList[index]));
+            itemToDuplicate.masterId = `master_${Date.now()}`;
+            allData.masterList.splice(index + 1, 0, itemToDuplicate);
+            saveAllData();
+            renderMasterList();
+        }
+        
+        function deleteMasterItem(index) {
+            if (confirm("Tem certeza que deseja excluir este item permanentemente da Lista Mestra?")) {
+                allData.masterList.splice(index, 1);
+                saveAllData();
+                renderMasterList();
+            }
+        }
+
+
+        // --- EVENT LISTENERS ---
+        newObraBtn.addEventListener('click', () => {
+            const name = prompt("Digite o nome da nova obra:");
+            if (name) {
+                if (allData.obras[name]) {
+                    alert("Já existe uma obra com este nome.");
+                    return;
+                }
+                allData.obras[name] = getBlankState();
+                allData.currentObra = name;
+                saveAllData();
+                fullRender();
+            }
+        });
+
+        editObraBtn.addEventListener('click', () => {
+            const oldName = allData.currentObra;
+            if (!oldName) return;
+            const newName = prompt("Digite o novo nome para a obra:", oldName);
+            if (newName && newName !== oldName) {
+                if (allData.obras[newName]) {
+                    alert("Já existe uma obra com este nome.");
+                    return;
+                }
+                allData.obras[newName] = allData.obras[oldName];
+                delete allData.obras[oldName];
+                allData.currentObra = newName;
+                saveAllData();
+                fullRender();
+            }
+        });
+
+        deleteObraBtn.addEventListener('click', () => {
+            const obraToDelete = allData.currentObra;
+            if (!obraToDelete) return;
+            if (Object.keys(allData.obras).length <= 1) {
+                alert("Não é possível excluir a última obra.");
+                return;
+            }
+            if (confirm(`Tem certeza que deseja excluir a obra "${obraToDelete}"? Esta ação não pode ser desfeita.`)) {
+                delete allData.obras[obraToDelete];
+                allData.currentObra = Object.keys(allData.obras)[0];
+                saveAllData();
+                fullRender();
+            }
+        });
+
+        obraSelect.addEventListener('change', (e) => {
+            allData.currentObra = e.target.value;
+            saveAllData();
+            fullRender();
+        });
+
+        resetObraBtn.addEventListener('click', () => {
+            const currentObraName = allData.currentObra;
+            if (!currentObraName) return;
+
+            if (confirm(`Tem certeza que deseja zerar todos os dados desta obra (${currentObraName})? A lista de itens será restaurada, mas todas as quinzenas, datas e configurações financeiras serão perdidas.`)) {
+                allData.obras[currentObraName] = getBlankState();
+                saveAllData();
+                fullRender();
+            }
+        });
+        
+        saveEditItemBtn.addEventListener('click', () => {
+            const state = getCurrentState();
+            const { item } = findItemAndOrigin(editItemIdInput.value, state);
+            if (item) {
+                item.c = editItemCInput.value;
+                item.d = editItemDInput.value;
+                editItemModal.style.display = 'none';
+                renderApp(state);
+                saveAllData();
+            }
+        });
+
+        document.querySelectorAll('.close-modal').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const modalId = e.currentTarget.dataset.modalId;
+                if(getEl(modalId)) {
+                    getEl(modalId).style.display = 'none';
+                }
+            });
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.item-card')) {
+                closeAllMenus();
+            }
+        });
+
+        fortnightQtyInput.addEventListener('change', (e) => { 
+            const state = getCurrentState();
+            if(state) {
+                state.fortnightCount = Math.max(0, parseInt(e.target.value) || 0);
+                handleStateUpdate();
+            }
+        });
+        startDateInput.addEventListener('change', (e) => { getCurrentState().startDate = e.target.value; handleStateUpdate(); });
+        totalValueInput.addEventListener('input', (e) => { getCurrentState().totalValue = parseFloat(e.target.value) || 0; handleStateUpdate(); });
+        distributionModeSelect.addEventListener('change', (e) => { getCurrentState().distributionMode = e.target.value; handleStateUpdate(); });
+        retainValueCheck.addEventListener('change', (e) => {
+            const state = getCurrentState();
+            state.retainValue = e.target.checked;
+            retainedAmountInput.style.display = state.retainValue ? 'inline-block' : 'none';
+            if(!state.retainValue) state.retainedAmount = 0;
+            handleStateUpdate();
+        });
+        retainedAmountInput.addEventListener('input', (e) => { getCurrentState().retainedAmount = parseFloat(e.target.value) || 0; handleStateUpdate(); });
+
+        addItemForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const state = getCurrentState();
+            const c = newItemCInput.value.trim(), d = newItemDInput.value.trim();
+            if (c && d) {
+                const maxIndex = Math.max(-1, ...state.mainList.map(i => i.originalIndex));
+                state.mainList.push({ id: crypto.randomUUID(), c, d, originalIndex: maxIndex + 1 });
+                state.mainList.sort((a,b) => a.originalIndex - b.originalIndex);
+                renderMainList(state); 
+                saveAllData(); 
+                addItemForm.reset(); 
+                newItemCInput.focus();
+            }
+        });
+
+        newMasterItemForm.addEventListener('submit', () => {
+            const newC = newMasterItemForm.querySelector('#new-master-c').value.trim();
+            const newD = newMasterItemForm.querySelector('#new-master-d').value.trim();
+            if (newC && newD) {
+                allData.masterList.push({
+                    c: newC,
+                    d: newD,
+                    masterId: `master_${Date.now()}`
+                });
+                saveAllData();
+                renderMasterList();
+                newMasterItemForm.reset();
+            }
+        });
+
+        saveBtn.addEventListener('click', () => { saveAllData(); alert('Todos os cronogramas foram salvos com sucesso!'); });
+        printBtn.addEventListener('click', generatePrintView);
+        manageMasterListBtn.addEventListener('click', () => {
+            renderMasterList();
+            masterListModal.style.display = 'flex';
+        });
+        
+        searchItemsInput.addEventListener('input', () => {
+            const state = getCurrentState();
+            if (state) {
+                renderMainList(state);
+            }
+        });
+
+        // --- INICIALIZAÇÃO ---
+        loadAllData();
+        fullRender();
+    });
+    </script>
+</body>
+</html>
